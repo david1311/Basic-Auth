@@ -16,15 +16,7 @@ class BasicAuth {
     }
 
     public function basicAuthHandler($user) {
-        global $wp_json_basic_auth_error;
-
-        $wp_json_basic_auth_error = null;
-
-        if ( !empty( $user ) ) {
-            return $user;
-        }
-
-        if ( !isset( $_SERVER['PHP_AUTH_USER'] ) ) {
+        if ( !isset( $_SERVER['PHP_AUTH_USER'] ) || !empty( $user ) ) {
             return $user;
         }
 
@@ -36,13 +28,6 @@ class BasicAuth {
         $user = wp_authenticate( $username, $password );
 
         add_filter( 'determine_current_user', [$this, 'basicAuthHandler'], 20 );
-
-        if ( is_wp_error( $user ) ) {
-            $wp_json_basic_auth_error = $user;
-            return null;
-        }
-
-        $wp_json_basic_auth_error = true;
 
         return $user->ID;
     }
