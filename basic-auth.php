@@ -8,55 +8,52 @@
  * Plugin URI: https://github.com/WP-API/Basic-Auth
  */
 
-function json_basic_auth_handler( $user ) {
-	global $wp_json_basic_auth_error;
+class BasicAuth {
+    public function __construct()
+    {
+        add_filter( 'determine_current_user', [$this, 'basicAuthHandler'], 20 );
+        add_filter( 'rest_authentication_errors', [$this, 'restAccessOnlyAllowToLoggedUsers' ]);
+    }
 
-	$wp_json_basic_auth_error = null;
+    public function basicAuthHandler($user) {
+        global $wp_json_basic_auth_error;
 
-	// Don't authenticate twice
-	if ( ! empty( $user ) ) {
-		return $user;
-	}
+        $wp_json_basic_auth_error = null;
 
-	// Check that we're trying to authenticate
-	if ( !isset( $_SERVER['PHP_AUTH_USER'] ) ) {
-		return $user;
-	}
+        if ( !empty( $user ) ) {
+            return $user;
+        }
 
-	$username = $_SERVER['PHP_AUTH_USER'];
-	$password = $_SERVER['PHP_AUTH_PW'];
+        if ( !isset( $_SERVER['PHP_AUTH_USER'] ) ) {
+            return $user;
+        }
 
-	/**
-	 * In multi-site, wp_authenticate_spam_check filter is run on authentication. This filter calls
-	 * get_currentuserinfo which in turn calls the determine_current_user filter. This leads to infinite
-	 * recursion and a stack overflow unless the current function is removed from the determine_current_user
-	 * filter during authentication.
-	 */
-	remove_filter( 'determine_current_user', 'json_basic_auth_handler', 20 );
+        $username = $_SERVER['PHP_AUTH_USER'];
+        $password = $_SERVER['PHP_AUTH_PW'];
 
-	$user = wp_authenticate( $username, $password );
+        remove_filter( 'determine_current_user', [$this, 'basicAuthHandler'], 20 );
 
-	add_filter( 'determine_current_user', 'json_basic_auth_handler', 20 );
+        $user = wp_authenticate( $username, $password );
 
-	if ( is_wp_error( $user ) ) {
-		$wp_json_basic_auth_error = $user;
-		return null;
-	}
+        add_filter( 'determine_current_user', [$this, 'basicAuthHandler'], 20 );
 
-	$wp_json_basic_auth_error = true;
+        if ( is_wp_error( $user ) ) {
+            $wp_json_basic_auth_error = $user;
+            return null;
+        }
 
-	return $user->ID;
+        $wp_json_basic_auth_error = true;
+
+        return $user->ID;
+    }
+
+    public function restAccessOnlyAllowToLoggedUsers( $access ) {
+        if( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+            return new WP_Error( 'rest_cannot_access', __( 'Only authenticated users can access the REST API.', 'disable-json-api' ), array( 'status' => rest_authorization_required_code() ) );
+        }
+        return $access;
+    }
 }
-add_filter( 'determine_current_user', 'json_basic_auth_handler', 20 );
 
-function json_basic_auth_error( $error ) {
-	// Passthrough other errors
-	if ( ! empty( $error ) ) {
-		return $error;
-	}
+new BasicAuth();
 
-	global $wp_json_basic_auth_error;
-
-	return $wp_json_basic_auth_error;
-}
-add_filter( 'rest_authentication_errors', 'json_basic_auth_error' );
