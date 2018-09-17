@@ -1,5 +1,14 @@
 {
-	"name" : "wp-api/basic-auth",
-	"description" : "Basic Authentication handler for the JSON API, used for development and debugging purposes",
-	"type" : "wordpress-plugin"
+	"name": "auth/rest-api",
+	"type": "wordpress-plugin",
+	"description": "Plugin to manage de rest api",
+	"autoload": {
+		"psr-4": {
+			"Auth\\": "lib/"
+		}
+	},
+	"require": {
+		"php": ">=7.1",
+		"firebase/php-jwt": "~4.0"
+	}
 }
